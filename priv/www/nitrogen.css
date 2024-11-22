@@ -4,7 +4,7 @@
 
 /***** Nitrogen Elements *****/
 
-label.nitrogen_label {
+label {
     display: block;
     font-weight: bold;
 }
@@ -350,5 +350,18 @@ a.upload_delete_file:hover {
 
 .nitrogen_calendar_today {
     background: rgba(0, 255, 0, 0.1);
+}
+
+/*** Nitrogen Validation ***/
+
+.nitrogen_validation_failed {
+	border: 1px solid #f00;
+	box-shadow: #f88 0 0 15px;
+}
+
+.nitrogen_validation_message {
+	color: #f00;
+	margin-left:10px;
+	display:inline-block;
 }
 

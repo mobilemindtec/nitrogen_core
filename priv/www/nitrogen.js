@@ -1258,8 +1258,20 @@ NitrogenClass.prototype.$set_values = function(anchor, element, values) {
 }
 
 NitrogenClass.prototype.$get_value = function(anchor, element) {
-    if (!element.id) element = objs(element);
-    el = element.get(0);
+    var el;
+    if(element == null) {
+        element=anchor;
+    }
+    if(typeof(element)=="string") {
+        element = objs(element);
+    }
+
+    if(element instanceof HTMLElement) {
+        el = element;
+    }else if(element instanceof jQuery) {
+        el = element.get(0);
+    }
+
     if (el.value != undefined) return el.value;
     else if (el.checked != undefined) return el.checked;
     else if (el.src != undefined) return el.src;
@@ -1891,12 +1903,36 @@ NitrogenClass.prototype.$close_websocket = function() {
         n.$disable_websockets();
     }
 };
-    
+
 
 NitrogenClass.prototype.$get_time = function() {
     return (new Date()).getTime();
 };
 
+/* Checking if arguments are of certain format */
+NitrogenClass.prototype.$is_integer = function(v) {
+    if(typeof(v)=="number") {
+        return Number.isInteger(v);
+    }else if(typeof(v)=="string") {
+        return /^-?\d+$/.test(v);
+    }else{
+        return false;
+    }
+};
+
+NitrogenClass.prototype.$is_float = function(v) {
+    if(typeof(v)=="number") {
+        return Number.isFloat(v);
+    }else if(typeof(v)=="string") {
+        return /^-?\d+(\.\d+)?$/.test(v);
+    }else{
+        return false;
+    }
+}
+
+NitrogenClass.prototype.$is_number = function(v) {
+    return this.$is_integer(v) || this.$is_float(v);
+}
 
 var page = document;
 

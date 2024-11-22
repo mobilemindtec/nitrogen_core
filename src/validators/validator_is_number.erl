@@ -39,7 +39,13 @@ render_action(Record = #is_number{}) ->
         tag=Record,
         attach_to=Record#is_number.attach_to
     },
-    Script = validation_handler:js_add_validator(TargetPath, Type, Text),
+    %Options = [
+    %    {allow_blank, wf:to_bool(Record#is_number.allow_blank},
+    %    {min, Record#is_number.min},
+    %    {max, Record#is_number.max}
+    %],
+    Opts = [],
+    Script = validation_handler:js_add_validator(TargetPath, Type, Text, Opts),
     [CustomValidatorAction, Script].
 
 validate(#is_number{allow_blank=AllowBlank, min=Min, max=Max, type=Type}, Value) ->
