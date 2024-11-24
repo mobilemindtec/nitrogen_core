@@ -45,7 +45,7 @@
 
 
 required_js() ->
-    wf_handler:call(?MODULE, ?FUNCTION_NAME, []).
+    wf_handler:call_readonly(?MODULE, ?FUNCTION_NAME, []).
 
 %%validate(ID, Text) ->
 %%    case wf_handler:call(?MODULE, ?FUNCTION_NAME, [ID, Text]) of

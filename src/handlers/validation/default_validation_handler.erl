@@ -66,7 +66,7 @@ js_constructor(TargetPath, ValidationGroup, ValidMessage, On, AttachTo, Config, 
 %% instead of its internal state - UNLESS wf_core is modified to add the
 %% validation_handler to the list of handlers that are serialized and
 %% deserialized
-maybe_dependency_wrap(Script, Config, State) ->
+ maybe_dependency_wrap(Script, Config, State) ->
     case ds:get(State, validation_prewrapped, false) of
         true ->
             {State, Script};
@@ -104,6 +104,7 @@ js_add_validator(Target, Type, FM, Opts, Config, State) ->
     end.
 
 %% FM=FailureMessage
+%% For now, we're not implementing these javascript elements 
 js_add_validator_inner(integer, _FM, _Opts, _Config, _State) ->
     [];
 js_add_validator_inner(number, _FM, _Opts, _Config, _State) ->

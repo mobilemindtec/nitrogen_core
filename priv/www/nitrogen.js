@@ -84,6 +84,7 @@ function NitrogenClass(o) {
     this.$websockets_ever_succeeded = false;
     this.$websocket_reconnect_timer = null;
     this.$websocket_handlers = new Array();
+    this.$validation_system = null;
     this.$disconnected = false;
     this.$allow_redirect = true;
     this.$redirect_prompt = "Are you sure you want to leave?";
@@ -498,6 +499,10 @@ NitrogenClass.prototype.$set_validation_loaded = function(systemName) {
     //console.log("marking validation system loaded: " + systemName);
     this.$set_trigger_loaded("validation_system_loaded");
     this.$execute_triggers("validation_system_loaded");
+}
+
+NitrogenClass.prototype.$get_validation_system = function() {
+    return this.$validation_system;
 }
 
 
@@ -1162,6 +1167,7 @@ NitrogenClass.prototype.$is_trigger_loaded = function(trigger) {
 };
 
 NitrogenClass.prototype.$set_trigger_loaded = function(trigger) {
+    this.$init_trigger_if_needed(trigger);
     this.$js_triggers[trigger].loaded=true;
 };
 

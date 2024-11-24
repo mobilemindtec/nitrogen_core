@@ -107,10 +107,25 @@ finish_dynamic_request() ->
     StateScript = serialize_context(),
     JavascriptFinal = unicode:characters_to_binary([StateScript, Javascript]),
 
+    %% wf_content:type is typically either postback_request or first_request.
+    %% If for some reason, it's not one of those, there was an issue decoding
+    %% something, so we'll treat it as a first request
     case wf_context:type() of
-        first_request       -> build_first_response(Html, JavascriptFinal);
-        postback_request    -> build_postback_response(JavascriptFinal);
-        _                   -> build_first_response(Html, JavascriptFinal)
+        postback_request ->
+            build_postback_response(JavascriptFinal);
+        _ ->
+            WrappedJS = maybe_wrap_with_validation_js(JavascriptFinal),
+            build_first_response(Html, WrappedJS)
+    end.
+
+maybe_wrap_with_validation_js(JavascriptFinal) ->
+    case validation_handler:required_js() of
+        X when ?WF_BLANK(X) ->
+            JavascriptFinal;
+        ValidationJS ->
+            [<<"Nitrogen.$dependency_register_function('">>, ValidationJS, <<"', function() {">>,
+                JavascriptFinal,
+            <<"});">>]
     end.
 
 maybe_render_elements(Elements = {sendfile, 0, _Size, _FullPath}) ->
