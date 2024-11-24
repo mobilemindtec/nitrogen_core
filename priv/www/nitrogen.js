@@ -76,6 +76,7 @@ function NitrogenClass(o) {
     this.$going_away = false;
     this.$maybe_going_away = false;
     this.$validation_data_field = "nitrogen_validation_field";
+    this.$validation_msg_class = "nitrogen_validation_failed";
     this.$before_postback_list = new Array();
     this.$js_triggers = new Array();
     this.$websocket = null;

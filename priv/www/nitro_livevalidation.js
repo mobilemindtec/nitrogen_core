@@ -20,18 +20,19 @@ if(Nitrogen.$get_validation_system() != "livevalidation") {
 
 	Nitrogen.$dependency_register_function("/nitrogen/livevalidation.min.js", function() {
 
-		var $validation_field = "LV_validation_field";
+		Nitrogen.$validation_data_field = "LV_validation_field";
+		Nitrogen.$validation_message_class = "LV_validation_message";
 
 		NitrogenClass.prototype.$get_validation = function(element) {
-			return $(element).data($validation_field);
+			return $(element).data(this.$validation_data_field);
 		};
 
 		NitrogenClass.prototype.$set_validation = function(element, data) {
-			return $(element).data($validation_field, data);
+			return $(element).data(this.$validation_data_field, data);
 		};
 
 		NitrogenClass.prototype.$remove_validation_artifacts = function(element) {
-			$(element).next(".LV_validation_message").remove();
+			$(element).next("." + this.$validation_msg_class).remove();
 		};
 
 

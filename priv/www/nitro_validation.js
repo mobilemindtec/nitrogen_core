@@ -68,22 +68,22 @@ class NitroVal {
 if(Nitrogen.$get_validation_system()!="nitrogen") {
 	(function() {
 		// Which HTML data field will the validators be stored in on the element
-		var $validation_field = "nitrogen_validation_field";
+		Nitrogen.$validation_data_field = "nitrogen_validation_field";
 		// The HTML class for the message that will show after the failed field message
-		var $validation_message_class = "nitrogen_validation_message";
+		Nitrogen.$validation_message_class = "nitrogen_validation_message";
 		// The Class to add to the target element when validation fails
-		var $validation_failed_class = "nitrogen_validation_failed";
+		Nitrogen.$validation_failed_class = "nitrogen_validation_failed";
 
 		NitrogenClass.prototype.$get_validation = function(element) {
-			return $(element).data($validation_field);
+			return $(element).data(this.$validation_data_field);
 		};
 
 		NitrogenClass.prototype.$set_validation = function(element, data) {
-			return $(element).data($validation_field, data);
+			return $(element).data(this.$validation_data_field, data);
 		};
 
 		NitrogenClass.prototype.$remove_validation_artifacts = function(element) {
-			$(element).next("." + $validation_message_class).remove();
+			$(element).next("." + this.$validation_message_class).remove();
 		};
 
 		NitrogenClass.prototype.$init_validation = function(element, group, opts) {
@@ -137,8 +137,8 @@ if(Nitrogen.$get_validation_system()!="nitrogen") {
 		NitrogenClass.prototype.$validation_click_or_focus_fun = function(element, attachTo) {
 			return function() {
 				Nitrogen.$remove_validation_artifacts(attachTo);
-				$(element).removeClass($validation_failed_class);
-			}
+				$(element).removeClass(Nitrogen.$validation_failed_class);
+			};
 		};
 		
 
@@ -149,7 +149,7 @@ if(Nitrogen.$get_validation_system()!="nitrogen") {
 
 			let focus_fun = Nitrogen.$validation_click_or_focus_fun(element, attachTo);
 
-			if($(element).hasClass($validation_failed_class)) {
+			if($(element).hasClass(this.$validation_failed_class)) {
 				focus_fun();
 			}
 
@@ -157,10 +157,10 @@ if(Nitrogen.$get_validation_system()!="nitrogen") {
 			$(element).on("click", focus_fun);
 				
 			$(element)
-				.addClass($validation_failed_class);
+				.addClass(this.$validation_failed_class);
 
 			$("<span>")
-				.addClass($validation_message_class)
+				.addClass(this.$validation_message_class)
 				.insertAfter(attachTo)
 				.html(html)
 		};
