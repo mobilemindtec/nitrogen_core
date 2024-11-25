@@ -53,6 +53,8 @@ validate(#is_number{allow_blank=AllowBlank, min=Min, max=Max, type=Type}, Value)
 
 validate(_AllowBlank=true, _Type, _Min, _Max, Value) when ?WF_BLANK(Value) ->
     true;
+validate(_AllowBlank=false, _Type, _Min, _Max, Value) when ?WF_BLANK(Value) ->
+    false;
 validate(_AllowBlank, Type, Min, Max, Value) ->
     validate_type(Type, Value) andalso validate_range(Type, Value, Min, Max).
 

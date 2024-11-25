@@ -26,7 +26,10 @@ render_action(Record)  ->
         attach_to=Record#confirm_same.attach_to
     }),
 
-    JSFunction = wf:f("function(value, args) { return (value == obj('~s').value); }", [ConfirmID]),
+    JSFunction = wf:f(
+        "function(value, args){
+            return (value == obj('~s').value);
+        }", [ConfirmID]),
 
     validator_js_custom:render_action(#js_custom{
         trigger=TriggerPath,

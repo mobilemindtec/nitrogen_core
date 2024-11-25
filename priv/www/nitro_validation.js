@@ -59,7 +59,9 @@ class NitroVal {
 
         if (hasError) {
             Nitrogen.$validation_error(this.element, this.attachTo, errorMsg);
-        }
+        }else{
+			Nitrogen.$clear_validation_error(this.element, this.attachTo);
+		}
 
         return !hasError;
     }
@@ -132,6 +134,11 @@ if(Nitrogen.$get_validation_system()!="nitrogen") {
 				clear();
 				this.$set_validation(element, null);
 			}
+		};
+
+		NitrogenClass.prototype.$clear_validation_error = function(element, attachTo) {
+			var f = this.$validation_click_or_focus_fun(element, attachTo);
+			f();
 		};
 
 		NitrogenClass.prototype.$validation_click_or_focus_fun = function(element, attachTo) {

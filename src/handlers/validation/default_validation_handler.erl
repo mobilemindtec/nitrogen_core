@@ -120,11 +120,13 @@ js_add_validator_inner(min_length, _FM, _Opts, _Config, _State) ->
 js_add_validator_inner(custom, FM, Opts, _Config, _State) ->
     [Function, Args, WhenEmpty0] = ds:get_list(Opts, [function, args, when_empty]),
     WhenEmpty = wf:to_bool(WhenEmpty0),
-    Fun = [
-        <<"\nfunction(v) { ">>,
-            <<"\nreturn ">>,action_js_fun:render_action(#js_fun{function=Function, args=Args}),
-        <<"}">>
-    ],
+    ?PRINT({Function, Args}),
+    FullFunText = 
+        <<"function(v) {
+            console.log(v);
+            return (~s)(v, ~s);
+        }">>,
+    Fun = wf:f(FullFunText, [Function, Args]),
     ValOpts = wf:json_encode([
         {msg, wf:to_unicode_binary(FM)},
         {when_empty, WhenEmpty}
