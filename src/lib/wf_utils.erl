@@ -16,6 +16,7 @@
     get_elementbase/1, get_actionbase/1, get_validatorbase/1, replace_with_base/2,
     fast_copy_fields/2,
     indexof/2,
+    any_member/2,
     replace_field/4,
     get_field/3,
     copy_fields/2,
@@ -119,6 +120,7 @@ coalesce([[]|T]) -> coalesce(T);
 coalesce([H|_]) -> H.
 
 %%% BASE RECORDS %%%
+
 
 get_actionbase(Term) -> ?COPY_TO_BASERECORD(actionbase, tuple_size(#actionbase{}), Term).
 get_elementbase(Term) -> ?COPY_TO_BASERECORD(elementbase, tuple_size(#elementbase{}), Term).
@@ -231,6 +233,13 @@ indexof(_Key, [], _N) -> undefined;
 indexof(Key, [Key|_T], N) -> N;
 indexof(Key, [_|T], N) -> indexof(Key, T, N + 1).
 
+-spec any_member(list(), list()) -> boolean().
+any_member(ListA, ListB) ->
+    lists:any(fun(A) ->
+        lists:member(A, ListB)
+    end, ListA).
+
+
 replace_field(Key, Value, Fields, Rec) ->
 	N = indexof(Key, Fields),
 	setelement(N, Rec, Value).
@@ -273,6 +282,8 @@ write_debug(Tag, Term) ->
     Output = wf:f("NITROGEN DEBUG: ~p~n~p~n*****************************************~n", [Tag, Term]),
     ok = file:write_file("nitrogen.debug", Output, [append]).
 
+%% PROFILING
+
 -define(PROFILE_FORMAT_STRING, "~p, ~p, ~p, ~p, ~p~n").
 
 -spec profile(Tag :: any(), Fun :: fun(), To :: undefined | pid() | string()) -> any().
@@ -301,6 +312,8 @@ profile(Tag, Fun, To) ->
             file:write_file(To, Output, [append])
     end,
     Res.
+
+%% PERSISTENT TERM (shortcuts)
 
 pterm(Key) ->
     persistent_term:get({nitrogen_core, Key}, undefined).

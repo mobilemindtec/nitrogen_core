@@ -7,15 +7,17 @@
 -include("wf.hrl").
 -export([
     reflect/0,
-    render_element/1,
+    transform_element/1,
     event/1
 ]).
 
 -spec reflect() -> [atom()].
 reflect() -> record_info(fields, inplace).
 
--spec render_element(#inplace{}) -> body().
-render_element(#inplace{
+-spec transform_element(#inplace{}) -> body().
+transform_element(#inplace{
+        id=WrapperID,
+        actions=Actions,
         text=Text,
         tag=Tag,
         delegate=Delegate,
@@ -25,135 +27,317 @@ render_element(#inplace{
         style=Style,
         start_mode=StartMode,
         data_fields=DataFields,
-        aria=Aria }) ->
+        replace_id=ReplaceID,
+        replace_value=ReplaceValue,
+        hover_text=HoverText0,
+        aria=Aria}) ->
 
-	OKButtonID = wf:temp_id(),
-	CancelButtonID = wf:temp_id(),
-	ViewPanelID = wf:temp_id(),
-	EditPanelID = wf:temp_id(),
+    [OKButtonID, CancelButtonID,
+     ViewPanelID, EditPanelID,
+     EditID, ViewID,
+     MouseOverID] = wf:temp_ids(7),
 
-	% Use id of edit if set, otherwise generate one
+    HoverText = wf:coalesce([HoverText0, "Click to edit"]),
 
-	BaseEdit = wf_utils:get_elementbase(Edit),
-	EditModule = BaseEdit#elementbase.module,
-	EditID = wf:coalesce([BaseEdit#elementbase.id, wf:temp_id()]),
-
-	% Use id of view if set, otherwise generate one
-
-	BaseView = wf_utils:get_elementbase(View),
-	ViewModule = BaseView#elementbase.module,
-	ViewID = wf:coalesce([BaseView#elementbase.id, wf:temp_id()]),
+    store_default_value(EditID, Text),
 
 	% Set up the events...
 
-	Controls = {ViewPanelID, ViewID, EditPanelID, EditID},
+	Controls = {
+        ViewPanelID,
+        ViewID,
+        EditPanelID,
+        EditID
+    },
+
 	OKPostback = {ok, Delegate, Controls, Tag},
 	CancelPostback = {cancel, Controls, Tag},
-	CancelEvent = #event{delegate=?MODULE, postback=CancelPostback, actions=[
-			#script{
-				script = wf:f("v=Nitrogen.$get_value('~s', '~s');Nitrogen.$set_value('~s', '~s', v);",
-					["", ViewID, "", EditID])
-            }
-		]},
 
-	% Create the view...
+    ViewActions = [
+		#buttonize{target=ViewPanelID},
+        #event{type=click, actions=[
+            #hide{target=ViewPanelID},
+            #show{target=EditPanelID},
+            wf:f("let e = objs('~s'); e.focus(); e.select();", [EditID])
+        ]}
 
-	ViewAction = [
-		#buttonize{target=ViewPanelID}
-	],
-
-	View1 = wf_utils:replace_field(id, ViewID, ViewModule:reflect(), View),
-	View2 = append_field_actions(ViewAction, undefined, ViewModule:reflect(), View1),
-	View3 = replace_field_text(Text, View2, ViewModule:reflect()),
+    ],
 
 	% Create the edit...
 
 	EditAction = [
-		#event { type=enterkey, shift_key=false, actions=#script { script=["objs('", OKButtonID, "').click();"] } },
-		#event { type=keyup, keycode=27, actions=#script { script=["objs('", CancelButtonID, "').click();"] } }
+        #event{type=enterkey, shift_key=false, actions=#click{target=OKButtonID}},
+		#event{type=keyup, keycode=27, actions=#click{target=CancelButtonID}}
 	],
 
-	Edit1 = wf_utils:replace_field(id, EditID, EditModule:reflect(), Edit),
-	Edit2 = append_field_actions(EditAction, OKButtonID, EditModule:reflect(), Edit1),
-	Edit3 = replace_field_text(Text, Edit2, EditModule:reflect()),
+    ModifyViewFun = fun(Body) ->
+        wf:defer(ViewID, [
+            #event{type=mouseover, target=MouseOverID, actions=#show{}},
+            #event{type=mouseout, target=MouseOverID, actions=#hide{}}
+        ]),
+
+        [
+            Body,
+            #span{id=MouseOverID, class=instructions, text=HoverText, style="display:none"}
+        ]
+    end,
+
+    ModifyEditFun = fun(Body) ->
+        [
+            maybe_modify_validators(Body, OKButtonID),
+            #button{id=OKButtonID, text="OK", delegate=?MODULE, postback=OKPostback},
+            #button{id=CancelButtonID, text="Cancel", delegate=?MODULE, postback=CancelPostback}
+        ]
+    end,
+
+    EditFun = maybe_make_edit_view_fun(Edit, ReplaceID, ReplaceValue, ModifyEditFun),
+    ViewFun = maybe_make_edit_view_fun(View, ReplaceID, ReplaceValue, ModifyViewFun),
+
+    store_edit_fun(EditID, EditFun),
+    store_view_fun(ViewID, ViewFun),
+
+    wf:defer(EditID, EditAction),
 
 	% No value in view mode cause the view panel unclickable thus
 	% we set edit mode in that case.
 
-	StartMode1 = case string:strip(Text) of
-		[] -> edit;
-		_ -> StartMode
-	end,
+	StartMode1 = ?WF_IF(not(?WF_BLANK(string:strip(Text))), StartMode, edit),
 
-	case StartMode1 of
-		view ->
-			wf:wire(EditPanelID, #hide{});
-		edit ->
-			wf:wire(ViewPanelID, #hide{}),
-			Script = #script { script="objs('me').focus(); objs('me').select();" },
-			wf:wire(EditID, Script)
-	end,
+    {ViewStyle, EditStyle} = case StartMode1 of
+        view -> {"", "display:none"};
+        edit -> {"display:none", ""}
+    end,
 
 	% Create the main panel...
 
-    #panel{class=[inplace, Class], data_fields=DataFields, aria=Aria, style=Style, body=[
-        #panel{id=ViewPanelID, class="view", body=[View3], actions=[
-            #event{type=click, actions=[
-                #hide{target=ViewPanelID},
-                #show{target=EditPanelID},
-                #script{script = wf:f("objs('~s').focus(); objs('~s').select();", [EditID, EditID])}
-            ]}
-        ]},
-        #panel{id=EditPanelID, class="edit", body=[
-            Edit3,
-            #button{id=OKButtonID, text="OK", delegate=?MODULE, postback=OKPostback},
-            #button{id=CancelButtonID, text="Cancel", actions=[CancelEvent#event{type=click}]}
-        ]}
+    #panel{id=WrapperID, class=[inplace, Class], data_fields=DataFields, aria=Aria, style=Style, actions=Actions, body=[
+        #panel{
+            id=ViewPanelID,
+            style=ViewStyle,
+            class=view,
+            actions=ViewActions,
+            body=ViewFun(ViewID, Text)
+        },
+        #panel{
+           id=EditPanelID,
+           style=EditStyle,
+           class=edit,
+           body=EditFun(EditID, Text)
+        }
     ]}.
 
+maybe_make_edit_view_fun(undefined, _ReplaceID, _ReplaceValue, PostFun)  ->
+    fun(ID, Value) ->
+        Body = #span{id=ID, class=label, text=Value},
+        PostFun(Body)
+    end;
+maybe_make_edit_view_fun(Fun, ReplaceID, ReplaceValue, undefined) ->
+    maybe_make_edit_view_fun_inner(Fun, ReplaceID, ReplaceValue);
+maybe_make_edit_view_fun(Fun, ReplaceID, ReplaceValue, PostFun) ->
+    InnerFun = maybe_make_edit_view_fun_inner(Fun, ReplaceID, ReplaceValue),
+    fun(ID, Value) ->
+        Body = InnerFun(ID, Value),
+        PostFun(Body)
+    end.
+
+maybe_make_edit_view_fun_inner(Fun, _, _) when is_function(Fun, 2) ->
+    Fun;
+maybe_make_edit_view_fun_inner(Rec, ReplaceID, ReplaceValue) when ?IS_ELEMENT(Rec) orelse is_list(Rec) ->
+    case has_explicit_value(Rec, [ReplaceID, ReplaceValue]) of
+        false ->
+            make_simple_fun(Rec);
+        true ->
+            make_deeper_fun(Rec, ReplaceID, ReplaceValue) 
+    end;
+maybe_make_edit_view_fun_inner(Rec, _ReplaceID, _ReplaceValue) ->
+    logger:error("Value: ~p is not valid to be the body of #inplace.edit or #inplace.view~n", [Rec]),
+    error({invalid_inplace_view_or_edit, Rec}).
+
+make_deeper_fun(Rec, ReplaceID, ReplaceValue) ->
+    PredID = fun(X) -> X==ReplaceID end,
+    PredVal = fun(X) -> X==ReplaceValue end,
+    fun(ID, Val) ->
+        UpdateIDFun = fun(_) -> ID end,
+        UpdateValFun = fun(_) -> Val end,
+        Rec2 = update_deep(Rec, PredID, UpdateIDFun),
+        update_deep(Rec2, PredVal, UpdateValFun)
+    end.
+
+
+make_simple_fun(Rec) when ?IS_ELEMENT(Rec) ->
+    %Module = element(#elementbase.module, Rec),
+    %Fields = Module:fields(),
+    fun(ID, Val) ->
+        set_id_and_value(Rec, ID, Val)
+    end;
+make_simple_fun(X) ->
+    logger:error("If the provided #inplace.view or #inplace.edit value does not contain an id='##' and a value of '$$', the provided value must be a simple element record (not a list or anything else)."),
+    error({invalid_inplace_view_or_edit, X}).
+
+%% looking for the atom '##' for id
+%% looking for the atom '$$' for value
+has_explicit_value(Rec, SearchVals) ->
+    Pred = fun
+        (X) when ?IS_ELEMENT(X) ->
+            Attrs = tl(tl(tuple_to_list(X))),
+            %?PRINT({looking_for_explicit, SearchVals, Attrs}),
+            wf_utils:any_member(SearchVals, Attrs);
+        (_) ->
+            %?PRINT({no_explicit_yet, X}),
+            false
+    end,
+    find_first(Rec, Pred).
+
+find_first(Rec, Pred) when ?IS_ELEMENT(Rec);
+                           ?IS_ACTION(Rec) ->
+                           %% ?IS_VALIDATOR(Rec) ->
+    case Pred(Rec) of
+        true -> true;
+        {true, X} -> {ok, X};
+        false ->
+            Attrs = tl(tl(tuple_to_list(Rec))),
+            find_first(Attrs, Pred)
+    end;
+find_first([H|T], Pred) ->
+    case find_first(H, Pred) of
+        true -> true;
+        {true, X} -> X;
+        false ->
+            find_first(T, Pred)
+    end;
+find_first([], _Pred) ->
+    false;
+find_first(_X, _Pred) ->
+    false.
+
+update_deep(Rec, Pred, UpdateFun) when ?IS_ELEMENT(Rec) ->
+    case Pred(Rec) of
+        true ->
+            UpdateFun(Rec);
+        false ->
+            [RecName, Module | Attrs] = tuple_to_list(Rec),
+            Attrs2 = [update_deep(Attr, Pred, UpdateFun) || Attr <- Attrs],
+            list_to_tuple([RecName, Module | Attrs2])
+    end;
+update_deep(List, Pred, UpdateFun) when is_list(List) ->
+    [update_deep(X, Pred, UpdateFun) || X <- List];
+update_deep(X, Pred, UpdateFun) ->
+    case Pred(X) of
+        true -> UpdateFun(X);
+        false -> X
+    end.
+
+%% %% Not implmeneted yet
+%% update_first_sub_element(Rec) ->
+%%     Rec.
+
+
+set_id_and_value(Rec, ID, Value) ->
+    Rec2 = set_id(Rec, ID),
+    set_value(Rec2, Value).
+
+set_id(Rec, ID) ->
+    setelement(#elementbase.id, Rec, ID).
+
+set_value(Rec, Value) ->
+    case value_field(Rec) of
+        undefined ->
+            error({value_field_unknown, Rec});
+        Field ->
+            setelement(Field, Rec, Value)
+    end.
+
+%% A few basic shortcuts, then make it look deeper
+value_field(#textbox{}) -> #textbox.text;
+value_field(#hidden{}) -> #hidden.text;
+value_field(#textarea{}) -> #textarea.text;
+value_field(#password{}) -> #password.text;
+value_field(#time{}) -> #time.datetime;
+value_field(#datepicker_textbox{}) -> #datepicker_textbox.text;
+value_field(#dropdown{}) -> #dropdown.value;
+value_field(#range{}) -> #range.value;
+value_field(#icon{}) -> #icon.icon;
+value_field(#image{}) -> #image.image;
+value_field(Rec) ->
+    Mod = element(#elementbase.module, Rec),
+    Fields = Mod:reflect(),
+    value_field(Fields, [value, text, body]).
+
+value_field(Fields, [H|T]) ->
+    case wf_utils:indexof(H, Fields) of
+        undefined -> value_field(Fields, T);
+        I -> I
+    end;
+value_field(_, []) ->
+    undefined.
+
+-define(def_val(EditID), {inplace_default_value, EditID}).
+-define(edit_fun(EditID), {inplace_edit_fun, EditID}).
+-define(view_fun(ViewID), {inplace_view_fun, ViewID}).
+
+store_default_value(EditID, Value) ->
+    wf:state(?def_val(EditID), Value).
+
+get_default_value(EditID) ->
+    wf:state_default(?def_val(EditID), undefined).
+
+store_edit_fun(EditID, Fun) ->
+    wf:state(?edit_fun(EditID), Fun).
+
+get_edit_fun(EditID) ->
+    wf:state_default(?edit_fun(EditID), undefined).
+
+store_view_fun(ViewID, Fun) ->
+    wf:state(?view_fun(ViewID), Fun).
+
+get_view_fun(ViewID) ->
+    wf:state_default(?view_fun(ViewID), undefined).
+
+
+        
+is_element(R) when ?IS_ELEMENT(R) -> true;
+is_element(_) -> false.
+
 -spec event(any()) -> ok.
-event({ok, Delegate, {ViewPanelID, ViewID, EditPanelID, EditID}, Tag}) ->
+event({ok, Delegate, Controls={ViewPanelID, _ViewID, EditPanelID, EditID}, Tag}) ->
 	Module = wf:coalesce([Delegate, wf:page_module()]),
 	Value = Module:inplace_event(Tag, string:strip(wf:q(EditID))),
-	wf:set(ViewID, Value),
-	wf:set(EditID, Value),
-	case Value =/= "" of
-			true ->
-				wf:wire(EditPanelID, #hide {}),
-				wf:wire(ViewPanelID, #show {});
-			false -> ok
-	end;
 
-event({cancel, {ViewPanelID, _ViewID, EditPanelID, EditID}, _Tag}) ->
-	case string:strip(wf:q(EditID)) =/= "" of
-			true ->
-				wf:wire(EditPanelID, #hide {}),
-				wf:wire(ViewPanelID, #show {});
-			false -> ok
-	end.
+    store_default_value(EditID, Value),
+    redraw_view_and_edit(Controls, Value),
 
-replace_field_text(Value, Element, Fields) ->
-	case element(1, Element) of
-		dropdown -> wf_utils:replace_field(value, Value, Fields, Element);
-		image -> wf_utils:replace_field(image, Value, Fields, Element);
-		_ -> wf_utils:replace_field(text, Value, Fields, Element)
-	end.
+    ?WF_IF(not(?WF_BLANK(Value)), begin
+        wf:wire(EditPanelID, #hide{}),
+        wf:wire(ViewPanelID, #show{})
+    end),
+    ok;
 
-modify_field_action(Action, Trigger) ->
-	case element(1, Action) of
-		validate -> Action#validate{ trigger = Trigger };
-		_ -> Action
-	end.
+event({cancel, Controls={ViewPanelID, _ViewID, EditPanelID, EditID}, _Tag}) ->
+    DefValue = get_default_value(EditID),
+    redraw_edit(Controls, DefValue),
+    ?WF_IF(not(?WF_BLANK(DefValue)), begin
+        wf:wire(EditPanelID, #hide{}),
+        wf:wire(ViewPanelID, #show{})
+    end),
+    ok.
 
-%% Set required trigger to original validate actions and append
-%% new actions specified by Actions.
-append_field_actions(Actions, Trigger, Fields, Rec) ->
-	N = wf_utils:indexof(actions, Fields),
-	ModifiedOldActions = case element(N, Rec) of
-		undefined -> [];
-		OldActions when is_list(OldActions) ->
-			[modify_field_action(X, Trigger) || X <- OldActions];
-		OldActions -> modify_field_action(OldActions, Trigger)
-	end,
-	setelement(N, Rec, Actions ++ ModifiedOldActions).
+redraw_view_and_edit(Controls={ViewPanelID, ViewID, _EditPanelID, _EditID}, Value) ->
+    ViewFun = get_view_fun(ViewID),
+    wf:update(ViewPanelID, ViewFun(ViewID, Value)),
+    redraw_edit(Controls, Value).
 
+redraw_edit({_, _, EditPanelID, EditID}, Value) ->
+    EditFun = get_edit_fun(EditID),
+    wf:update(EditPanelID, EditFun(EditID, Value)).
+
+
+maybe_modify_validators(Rec,  Trigger) ->
+    Pred = fun
+        (#validate{}) -> true;
+        (_) -> false
+    end,
+    Update = fun
+        (X = #validate{}) -> X#validate{trigger=Trigger};
+        (X) -> X
+    end,
+    update_deep(Rec, Pred, Update).

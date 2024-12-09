@@ -3,8 +3,8 @@
 % Copyright (c) 2008-2010 Rusty Klophaus
 % See MIT-LICENSE for licensing information.
 
--module (element_bind).
--include_lib ("wf.hrl").
+-module(element_bind).
+-include("wf.hrl").
 -compile(export_all).
 
 % Transform function is of the form:
@@ -95,10 +95,9 @@ apply_bindings(Bindings, Term) when is_tuple(Term) ->
                 replace_field(ChildField, Children1, Fields, Rec)
         end
     end,
-    lists:foldl(F2, Term1, [body, empty_body, rows, cells]);
+    lists:foldl(F2, Term1, wf_render_elements:body_fields());
 
 apply_bindings(_, Term) -> Term.
-
 
 get_field(Key, Fields, Rec) -> 
     case indexof(Key, Fields) of

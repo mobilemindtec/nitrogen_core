@@ -176,6 +176,8 @@
 
 -define(IS_ACTION(X), (is_tuple(X) andalso element(#actionbase.is_action, X)==is_action)).
 
+-define(IS_VALIDATOR(X), (is_tuple(X) andalso element(#validatorbase.is_action, X)==is_validator)).
+
 -define(IS_ELEMENT(X), (is_tuple(X) andalso element(#elementbase.is_element, X)==is_element)).
 
 %%% HELPER MACROS %%%
@@ -715,7 +717,8 @@
         html_encode=true        :: html_encode(),
         start_mode=view         :: view | edit,
         validators=[]           :: validators(),
-        delegate                :: module()
+        delegate                :: module(),
+        hover_text              :: undefined | text()
     }).
 -record(inplace_textbox, {?ELEMENT_BASE(element_inplace_textbox),
         tag                     :: term(),
@@ -723,15 +726,19 @@
         html_encode=true        :: html_encode(),
         start_mode=view         :: view | edit,
         validators=[]           :: validators(),
-        delegate                :: module()
+        delegate                :: module(),
+        hover_text              :: undefined | text()
     }).
 -record(inplace, {?ELEMENT_BASE(element_inplace),
         tag                     :: term(),
         text=""                 :: text(),
         delegate                :: module(),
-        view                    :: body(),
-        edit                    :: body(),
-        start_mode=view         :: view | edit
+        view                    :: undefined | fun((ID :: term(), Val :: term()) -> body()) | body(),
+        edit                    :: undefined | fun((ID :: term(), Val :: term()) -> body()) | body(),
+        start_mode=view         :: view | edit,
+        hover_text              :: undefined | text(),
+        replace_id='##'         :: term(),
+        replace_value='$$'      :: term()
     }).
 
 -record(upload, {?ELEMENT_BASE(element_upload),
