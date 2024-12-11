@@ -85,8 +85,8 @@ transform_element(#inplace{
     ModifyEditFun = fun(Body) ->
         [
             maybe_modify_validators(Body, OKButtonID),
-            #button{id=OKButtonID, text="OK", delegate=?MODULE, postback=OKPostback},
-            #button{id=CancelButtonID, text="Cancel", delegate=?MODULE, postback=CancelPostback}
+            #button{id=OKButtonID, class=inplace_ok, text="OK", delegate=?MODULE, postback=OKPostback},
+            #button{id=CancelButtonID, class=inplace_cancel, text="Cancel", delegate=?MODULE, postback=CancelPostback}
         ]
     end,
 
