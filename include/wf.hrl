@@ -176,6 +176,7 @@
 
 -define(IS_ACTION(X), (is_tuple(X) andalso element(#actionbase.is_action, X)==is_action)).
 
+%% TODO: Still not done
 -define(IS_VALIDATOR(X), (is_tuple(X) andalso element(#validatorbase.is_action, X)==is_validator)).
 
 -define(IS_ELEMENT(X), (is_tuple(X) andalso element(#elementbase.is_element, X)==is_element)).
