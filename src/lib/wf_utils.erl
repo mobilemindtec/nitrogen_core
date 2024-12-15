@@ -11,6 +11,7 @@
     path_search/3,
     replace/3,
     coalesce/1,
+    eval_coalesce/1,
     is_process_alive/1,
     debug/0, break/0,
     get_elementbase/1, get_actionbase/1, get_validatorbase/1, replace_with_base/2,
@@ -115,9 +116,18 @@ replace(String, S1, S2) when is_list(String), is_list(S1), is_list(S2) ->
 
 coalesce([]) -> undefined;
 coalesce([H]) -> H;
-coalesce([undefined|T]) -> coalesce(T);
-coalesce([[]|T]) -> coalesce(T);
+coalesce([H|T]) when ?WF_BLANK(H) -> coalesce(T);
 coalesce([H|_]) -> H.
+
+eval_coalesce([]) -> undefined;
+eval_coalesce([H]) when is_function(H, 0) -> H;
+eval_coalesce([H|T]) when is_function(H, 0) ->
+    case H() of
+        X when ?WF_BLANK(X) ->
+            eval_coalesce(T);
+        X ->
+            X
+    end.
 
 %%% BASE RECORDS %%%
 
