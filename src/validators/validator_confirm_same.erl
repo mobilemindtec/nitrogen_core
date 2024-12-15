@@ -3,7 +3,7 @@
 % Copyright (c) 2008-2010 Rusty Klophaus
 % See MIT-LICENSE for licensing information.
 
--module (validator_confirm_same).
+-module(validator_confirm_same).
 -include("wf.hrl").
 -export([
     render_action/1,
@@ -12,7 +12,7 @@
 
 -spec render_action(#confirm_same{}) -> script().
 render_action(Record)  ->
-    TriggerPath= Record#confirm_same.trigger,
+    TriggerPath = Record#confirm_same.trigger,
     TargetPath = Record#confirm_same.target,
     Text = wf:js_escape(Record#confirm_same.text),
     ConfirmID = Record#confirm_same.confirm_id,
@@ -26,7 +26,10 @@ render_action(Record)  ->
         attach_to=Record#confirm_same.attach_to
     }),
 
-    JSFunction = wf:f("function(value, args) { return (value == obj('~s').value); }", [ConfirmID]),
+    JSFunction = wf:f(
+        "function(value, args){
+            return (value == obj('~s').value);
+        }", [ConfirmID]),
 
     validator_js_custom:render_action(#js_custom{
         trigger=TriggerPath,

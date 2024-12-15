@@ -7,8 +7,6 @@
 -include("wf.hrl").
 -compile (export_all).
 
-v() -> 1.
-
 %%% EXPOSE WIRE, UPDATE, FLASH %%%
 wire(Actions) ->
     ok = wire(undefined, undefined, Actions).
@@ -291,6 +289,11 @@ to_js_id(Path) ->
 
 temp_id() ->
     _String = wf_render_elements:temp_id().
+
+temp_ids(X) when X =< 0  ->
+    [];
+temp_ids(X) ->
+    [temp_id() | temp_ids(X-1)].
 
 normalize_id(Path) ->
     _String = wf_render_elements:normalize_id(Path).

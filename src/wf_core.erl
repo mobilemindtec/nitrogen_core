@@ -107,10 +107,25 @@ finish_dynamic_request() ->
     StateScript = serialize_context(),
     JavascriptFinal = unicode:characters_to_binary([StateScript, Javascript]),
 
+    %% wf_content:type is typically either postback_request or first_request.
+    %% If for some reason, it's not one of those, there was an issue decoding
+    %% something, so we'll treat it as a first request
     case wf_context:type() of
-        first_request       -> build_first_response(Html, JavascriptFinal);
-        postback_request    -> build_postback_response(JavascriptFinal);
-        _                   -> build_first_response(Html, JavascriptFinal)
+        postback_request ->
+            build_postback_response(JavascriptFinal);
+        _ ->
+            WrappedJS = maybe_wrap_with_validation_js(JavascriptFinal),
+            build_first_response(Html, WrappedJS)
+    end.
+
+maybe_wrap_with_validation_js(JavascriptFinal) ->
+    case validation_handler:required_js() of
+        X when ?WF_BLANK(X) ->
+            JavascriptFinal;
+        ValidationJS ->
+            [<<"Nitrogen.$dependency_register_function('">>, ValidationJS, <<"', function() {">>,
+                JavascriptFinal,
+            <<"});">>]
     end.
 
 maybe_render_elements(Elements = {sendfile, 0, _Size, _FullPath}) ->
@@ -159,7 +174,8 @@ serialize_context() ->
 
     % Get handler context, but don't serialize the config.
     StateHandler = wf_context:handler(state_handler),
-    SerializedContextState = wf_pickle:pickle([Page, StateHandler]),
+    ValidationHandler = wf_context:handler(validation_handler),
+    SerializedContextState = wf_pickle:pickle([Page, StateHandler, ValidationHandler]),
     wf:f("Nitrogen.$set_param('pageContext', '~s');~n", [SerializedContextState]).
 
 deserialize_request_context() ->
@@ -180,9 +196,9 @@ deserialize_context(undefined) ->
 deserialize_context(SerializedPageContext) ->
     % Deserialize page_context and handler_list if available...
     case wf_pickle:depickle(SerializedPageContext) of
-        [PageContext, NewStateHandler] ->
+        [PageContext | NewHandlers] ->
             wf_context:page_context(PageContext),
-            wf_context:restore_handler(NewStateHandler),
+            [wf_context:restore_handler(H) || H <- NewHandlers],
             ok;
         undefined ->
             exit({failure_to_deserialize_page_context, [

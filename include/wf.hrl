@@ -29,6 +29,10 @@
 %% Allow Dialzer to be run on the .ebin files
 -compile(debug_info).
 
+
+%% TODO:  Huge Todo:  Migrate all the named types from this file to
+%% nitrogen.erl. I suspect this will speed up dialyzer comparisons quite nicely
+
 -type nitrogen_element()    :: tuple().
 -type template_script_element() :: script | mobile_script.
 -type body_element()        :: nitrogen_element() | binary() | string() | iolist()
@@ -89,6 +93,10 @@
 -type websocket_in()        :: websocket_msg() | websocket_decoded().
 -type websocket_out()       :: websocket_msg().
 -type websocket_reply()     :: noreply | {reply, websocket_out()}.
+
+-type validator_type()      :: integer | number | not_blank | email | max_length | min_length | custom | atom().
+-type validate_event()      :: submit | blur | postback.
+-type validate_events()     :: validate_event() | [validate_event()].
 
 %%% CONTEXT %%%
 
@@ -172,6 +180,18 @@
 -define(IS_ACTION_PRIORITY(Priority),
     (Priority=:=normal orelse Priority=:=eager orelse Priority=:=defer)).
 
+-define(WF_BLANK(X), (X==undefined orelse X=="" orelse X==<<>>)).
+
+-define(IS_ACTION(X), (is_tuple(X) andalso element(#actionbase.is_action, X)==is_action)).
+
+%% TODO: Still not done
+-define(IS_VALIDATOR(X), (is_tuple(X) andalso element(#validatorbase.is_action, X)==is_validator)).
+
+-define(IS_ELEMENT(X), (is_tuple(X) andalso element(#elementbase.is_element, X)==is_element)).
+
+%%% HELPER MACROS %%%
+
+
 -define(PRIORITY_WIRE(Priority),
         (case Priority of
             eager   -> eager;
@@ -180,6 +200,7 @@
             wire    -> wire
         end)
     ).
+
 
 -define(WF_SAFE(Exp, Default), (try Exp catch _:_ -> Default end)).
 
@@ -718,7 +739,8 @@
         html_encode=true        :: html_encode(),
         start_mode=view         :: view | edit,
         validators=[]           :: validators(),
-        delegate                :: module()
+        delegate                :: module(),
+        hover_text              :: undefined | text()
     }).
 -record(inplace_textbox, {?ELEMENT_BASE(element_inplace_textbox),
         tag                     :: term(),
@@ -726,15 +748,19 @@
         html_encode=true        :: html_encode(),
         start_mode=view         :: view | edit,
         validators=[]           :: validators(),
-        delegate                :: module()
+        delegate                :: module(),
+        hover_text              :: undefined | text()
     }).
 -record(inplace, {?ELEMENT_BASE(element_inplace),
         tag                     :: term(),
         text=""                 :: text(),
         delegate                :: module(),
-        view                    :: body(),
-        edit                    :: body(),
-        start_mode=view         :: view | edit
+        view                    :: undefined | fun((ID :: term(), Val :: term()) -> body()) | body(),
+        edit                    :: undefined | fun((ID :: term(), Val :: term()) -> body()) | body(),
+        start_mode=view         :: view | edit,
+        hover_text              :: undefined | text(),
+        replace_id='##'         :: term(),
+        replace_value='$$'      :: term()
     }).
 
 -record(upload, {?ELEMENT_BASE(element_upload),
@@ -1019,7 +1045,7 @@
     }).
 %% we want validation assignments to happen last, so we use AV_BASE and set deferral to zero first
 -record(validate, {?ACTION_BASE(action_validate),
-        on=submit               :: atom(),
+        on=submit               :: validate_events(),
         success_text=" "        :: text(),
         group                   :: string() | binary() | atom(),
         validators              :: validators(),
@@ -1144,22 +1170,23 @@
         unless_has_value        :: undefined | id() | [id()]
     }).
 -record(is_email, {?VALIDATOR_BASE(validator_is_email)}).
--record(is_integer, {?VALIDATOR_BASE(validator_is_integer),
+-record(is_integer, {?VALIDATOR_BASE(validator_is_number),
         min                     :: undefined | integer(),
         max                     :: undefined | integer(),
         allow_blank=false       :: boolean()
     }).
 -record(is_number, {?VALIDATOR_BASE(validator_is_number),
+        type=number             :: number | integer,
         min                     :: undefined | integer(),
         max                     :: undefined | integer(),
         allow_blank=false       :: boolean()
     }).
--record(min_length, {?VALIDATOR_BASE(validator_min_length),
+-record(min_length, {?VALIDATOR_BASE(validator_length),
         length                  :: undefined | integer()
     }).
--record(max_length, {?VALIDATOR_BASE(validator_max_length),
-        length                  :: undefined | integer()
-    }).
+
+?WF_EXTEND(min_length, max_length, validator_length, []).
+
 -record(confirm_password, {?VALIDATOR_BASE(validator_confirm_password),
         password                :: id()
     }).

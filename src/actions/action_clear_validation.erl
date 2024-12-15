@@ -3,8 +3,8 @@
 % Copyright (c) 2008-2010 Rusty Klophaus
 % See MIT-LICENSE for licensing information.
 
--module (action_clear_validation).
--include_lib ("wf.hrl").
+-module(action_clear_validation).
+-include("wf.hrl").
 -compile(export_all).
 
 render_action(Record) -> 
@@ -34,30 +34,18 @@ render_action(Record) ->
 	end.
 
 clear_all_validators() ->
-	set_validators([]),
+    wf_validation:clear_all_validators(),
 	"Nitrogen.$destroy_all_validation()".
 
 clear_specific_validators(Trigger, Target) ->
-	Validators = get_validators(),
-	FilteredValidators = [X || X={ValGroup, ValPath, _} <- Validators, not(ValGroup==Trigger andalso ValPath==Target)],
-	set_validators(FilteredValidators),
+    wf_validation:clear_specific_validators(Trigger, Target),
 	wf:f("Nitrogen.$destroy_specific_validation('~ts','~ts')",[Trigger, Target]).
 
 clear_target_validators(Target) ->
-	Validators = get_validators(),
-	FilteredValidators = [X || X={_, ValPath, _} <- Validators, ValPath =/= Target],
-	set_validators(FilteredValidators),
+    wf_validation:clear_target_validators(Target),
 	wf:f("Nitrogen.$destroy_target_validation('~ts')",[Target]).
-	
+
 clear_trigger_validators(Trigger) ->
-	Validators = get_validators(),
-	FilteredValidators = [X || X={ValGroup, _, _} <- Validators, ValGroup =/= Trigger],
-	set_validators(FilteredValidators),
+    wf_validation:clear_trigger_validators(Trigger),
 	wf:f("Nitrogen.$destroy_validation_group('~ts')",[Trigger]).
 
-
-get_validators() ->
-	state_handler:get_state(validators, []).
-
-set_validators(Validators) ->
-	state_handler:set_state(validators, Validators).

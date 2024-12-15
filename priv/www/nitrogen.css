@@ -4,7 +4,7 @@
 
 /***** Nitrogen Elements *****/
 
-label.nitrogen_label {
+label {
     display: block;
     font-weight: bold;
 }
@@ -16,16 +16,19 @@ label.nitrogen_label {
 
 /*** INPLACE EDITING ***/
 
+div.inplace div.view,
 div.inplace_textarea div.view,
 div.inplace_textbox div.view {
     cursor: pointer;
 }
 
+div.inplace .label,
 div.inplace_textarea .label,
 div.inplace_textbox .label {
     display: inline;
 }
 
+div.inplace .instructions, 
 div.inplace_textarea .instructions, 
 div.inplace_textbox .instructions {
     padding-left: 12px;
@@ -355,5 +358,17 @@ a.upload_delete_file:hover {
 .button_icon,
 .link_icon {
 	margin-right: 0.2em;
+
+/*** Nitrogen Validation ***/
+
+.nitrogen_validation_failed {
+	border: 1px solid #f00;
+	box-shadow: #f88 0 0 15px;
+}
+
+.nitrogen_validation_message {
+	color: #f00;
+	margin-left:10px;
+	display:inline-block;
 }
 

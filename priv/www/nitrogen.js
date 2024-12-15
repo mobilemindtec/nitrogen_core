@@ -12,6 +12,27 @@ const WebSocketStatus = {
     CONNECTED: 1
 };
 
+
+// NDP = Nitrogen Deferred Promise 
+// It's a hack to use until Promise.withResolvers is more widely available
+// (since it was introduced late 2023).
+// This code copied from https://stackoverflow.com/a/47112177
+class NitrogenDeferredPromise {
+    constructor() {
+        this._promise = new Promise((resolve, reject) => {
+            // assign the resolve and reject functions to `this`
+            // making them usable on the class instance
+            this.resolve = resolve;
+            this.reject = reject;
+        });
+        // bind `then` and `catch` to implement the same interface as Promise
+        this.then = this._promise.then.bind(this._promise);
+        this.catch = this._promise.catch.bind(this._promise);
+        this.finally = this._promise.finally.bind(this._promise);
+        this[Symbol.toStringTag] = 'Promise';
+    }
+}
+
 function NitrogenClass(o) {
     this.$url = document.location.href;
     this.$div = document;
@@ -54,15 +75,17 @@ function NitrogenClass(o) {
     this.$last_system_event = null;
     this.$going_away = false;
     this.$maybe_going_away = false;
-    this.$live_validation_data_field = "LV_live_validation";
+    this.$validation_data_field = "nitrogen_validation_field";
+    this.$validation_msg_class = "nitrogen_validation_failed";
     this.$before_postback_list = new Array();
-    this.$js_dependencies = new Array();
+    this.$js_triggers = new Array();
     this.$websocket = null;
     this.$websockets_enabled = false; // default to off
     this.$websocket_status = WebSocketStatus.NOT_ATTEMPTED;
     this.$websockets_ever_succeeded = false;
     this.$websocket_reconnect_timer = null;
     this.$websocket_handlers = new Array();
+    this.$validation_system = null;
     this.$disconnected = false;
     this.$allow_redirect = true;
     this.$redirect_prompt = "Are you sure you want to leave?";
@@ -71,7 +94,7 @@ function NitrogenClass(o) {
 
 /*** EVAL CONTROL ***/
 
-// Control the evaulation yourself. If you'd rather capture the responses on
+// Control the evaluation yourself. If you'd rather capture the responses on
 // your own and evaulate them at your control, you would rebind Nitrogen.$eval.
 // After loading nitrogen.js, add:
 // 
@@ -355,20 +378,18 @@ NitrogenClass.prototype.$validate_and_serialize = function(vessel, validationGro
     var all_inputs = jQuery(inputs).not(".no_postback");
 
     jQuery(all_inputs).each(function(i) {
-        var LV = Nitrogen.$get_validation(this);
-        if (LV && LV.group == validationGroup && !LV.validate()) {
+        // We check client-side-validation first.  If all the client-side
+        // validation passes, then we'll package up the params and send them
+        // over via postback.
+        if (!n.$validate_element(this, validationGroup)) {
             // Set a flag, but keep validating to show all messages.
             is_valid = false;
         } else {
-            // Skip any unchecked radio boxes.
-            if ((this.type=="radio" || this.type=="checkbox") && !this.checked) return;
-            // Skip multi-select boxes with nothing selected
-            if (this.type=="select-multiple" && ($(this).val()==null || ($(this).val().length==0))) return;
-            // Skip any plain buttons or submit buttons
-            if (this.type=='button' || this.type=='submit') return;
-            
-            // Skip elements that aren't nitrogen elements (they won't have a
-            // properly named Nitrogen 'id')
+            // Short circuit this element if it's one of the items we don't
+            // want to to submit
+            if(n.$ignore_element(this))
+                return;
+
             var id = n.$make_id(this);
             if(id == "") return;
 
@@ -376,9 +397,7 @@ NitrogenClass.prototype.$validate_and_serialize = function(vessel, validationGro
             // an empty string if it's null
             var val = $(this).val();
 
-            //console.log(val);
-
-            if(val == null || (this.type=="select-multiple" && val.length==0))
+            if(val == null)
                 val = "";
         
             // Add to the parameter list to send to the server
@@ -389,49 +408,136 @@ NitrogenClass.prototype.$validate_and_serialize = function(vessel, validationGro
     return is_valid && params || null;
 }
 
-NitrogenClass.prototype.$add_validation = function(element, args) {
+NitrogenClass.prototype.$ignore_element = function(element) {
+    return this.$is_unchecked(element)
+        || this.$is_empty_multiselect(element)
+        || this.$is_button(element)
+        || !this.$is_nitrogen_element(element);
+};
+
+NitrogenClass.prototype.$is_unchecked = function(element) {
+    // Skip any unchecked radio boxes.
+    return (element.type=="radio" || element.type=="checkbox")
+            && !element.checked
+};
+
+NitrogenClass.prototype.$is_empty_multiselect = function(element) {
+    // Skip multi-select boxes with nothing selected
+    return element.type=="select-multiple"
+            && ($(element).val()==null || ($(element).val().length==0));
+};
+
+NitrogenClass.prototype.$is_button = function(element) {
+    // Skip any plain buttons or submit buttons
+    return (element.type=='button' || element.type=='submit');
+};
+
+NitrogenClass.prototype.$is_nitrogen_element = function(element) {
+    // Skip elements that aren't nitrogen elements (they won't have a
+    // properly named Nitrogen 'id')
+    var id = this.$make_id(element);
+    return (id != "");
+};
+
+NitrogenClass.prototype.$init_validation = function(element, group, args) {
+    //console.log("queuing init_validation: " + element);
+    this.$register_trigger("validation_system_loaded", function() {
+        Nitrogen.$init_validation(element, group, args);
+    });
+
+    /*
     if($(element)){
-        if(!$(element).data(Nitrogen.$live_validation_data_field))
-            $(element).data(Nitrogen.$live_validation_data_field, new LiveValidation(element, args));
+        // If the element exists, let's check if there is already validation data on the element
+        if(!$(element).data(this.$validation_data_field))
+            // Since there is not currently validation data on the element, let's initialize some
+            $(element).data(this.$validation_data_field, {});
         return Nitrogen.$get_validation(element);
-    } else
+    } else {
         return null;
-}
+    }
+    */
+};
+
+/*
+NitrogenClass.prototype.$get_validation_promise = new NitrogenDeferredPromise();
+NitrogenClass.prototype.$set_validation_promise = new NitrogenDeferredPromise();
+NitrogenClass.prototype.$init_validation_promise = new NitrogenDeferredPromise();
+NitrogenClass.prototype.$validate_element_promise = new NitrogenDeferredPromise();
+NitrogenClass.prototype.$add_validation_promise = new NitrogenDeferredPromise();
+NitrogenClass.prototype.$remove_validation_artifacts_promise = new NitrogenDeferredPromise();
+*/
 
 NitrogenClass.prototype.$get_validation = function(element) {
-    return $(element).data(Nitrogen.$live_validation_data_field);
+    throw("validation not loaded");
+    /*return $(element).data(this.$validation_data_field);*/
+};
+
+NitrogenClass.prototype.$set_validation = function(element, data) {
+    throw("validation not loaded");
+    //$(element).data(this.$validation_data_field, data);
+};
+
+NitrogenClass.prototype.$validate_element = function(element) {
+    throw("validation not loaded");
+};
+
+NitrogenClass.prototype.$add_validation = function(element, fun) {
+    //console.log("queuing add_validation: " + element);
+    this.$register_trigger("validation_system_loaded", function() {
+        Nitrogen.$add_validation(element, fun);
+    });
+};
+
+NitrogenClass.prototype.$remove_validation_artifacts = function(element) {
+};
+
+NitrogenClass.prototype.$is_validation_loaded = function() {
+    return this.$is_trigger_loaded("validation_system_loaded");
+};
+
+NitrogenClass.prototype.$set_validation_loaded = function(systemName) {
+    this.$validation_system = systemName;
+    //console.log("marking validation system loaded: " + systemName);
+    this.$set_trigger_loaded("validation_system_loaded");
+    this.$execute_triggers("validation_system_loaded");
 }
+
+NitrogenClass.prototype.$get_validation_system = function() {
+    return this.$validation_system;
+}
+
 
 // TODO: This needs to be made smarter. Right now, I'm pretty sure elements have
 // single validation groups, while it should be a list of groups that get validated
-NitrogenClass.prototype.$destroy_specific_validation = function(trigger, target) {
-    var v = Nitrogen.$get_validation(target);
+NitrogenClass.prototype.$destroy_specific_validation = async function(trigger, target) {
+    var v = (await this.$get_validation)(target);
     if(v.group==trigger)
-        Nitrogen.$destroy_target_validation(target);
-}
+        this.$destroy_target_validation(target);
+};
 
 NitrogenClass.prototype.$destroy_target_validation = function(element) {
-    var v = Nitrogen.$get_validation(element);
+    var v = this.$get_validation(element);
     if(v) {
-        v.destroy();
-        $(element).data(Nitrogen.$live_validation_data_field,null);
+        $(element).data(this.$validation_data_field,null);
     }
-}
+};
 
 NitrogenClass.prototype.$destroy_validation_group = function(validationGroup) {
+    var this2 = this;
     jQuery(":input").not(".no_postback").each(function(i) {
-        var LV = Nitrogen.$get_validation(this);
+        var LV = this2.$get_validation(this);
         if( LV && LV.group == validationGroup) {
-            Nitrogen.$destroy_target_validation(this);
+            this2.$destroy_target_validation(this);
         }
     });
-}
+};
 
 NitrogenClass.prototype.$destroy_all_validation = function() {
+    var this2 = this;
     $("*").each(function() {
-        Nitrogen.$destroy_target_validation(this);
+        this2.$destroy_target_validation(this);
     });
-}
+};
 
 NitrogenClass.prototype.$make_id = function(element) {
     var a = [];
@@ -444,7 +550,7 @@ NitrogenClass.prototype.$make_id = function(element) {
         element = element.parentNode;
     }  
     return a.join(".");
-}
+};
 
 
 /*** AJAX METHODS ***/
@@ -459,7 +565,7 @@ NitrogenClass.prototype.$hide_spinner = function() {
 
 NitrogenClass.prototype.$do_event = function(vessel, validationGroup, onInvalid, eventContext, extraParam, ajaxSettings) {
     var n = this;
-    
+
     // Flag to prevent firing multiple postbacks at the same time...
     this.$event_is_running = true;
 
@@ -711,7 +817,7 @@ NitrogenClass.prototype.$attach_upload_handle_dragdrop = function(form,input,set
             always: function(e,data) {
             },
             fail: function(e,data, options) {
-                Nitrogen.$increment_pending_upload_counter(form,-1);
+                thisNitro.$increment_pending_upload_counter(form,-1);
             },
             add: function(e,data) {
                 if(!settings.multiple) {
@@ -957,8 +1063,8 @@ NitrogenClass.prototype.$insert_after = function(anchor, path, html) {
 }
 
 NitrogenClass.prototype.$remove = function(anchor, path) {
-    var x = objs(path, anchor).remove();
-    $(x).next('.LV_validation_message').remove();
+    var x = objs(path, anchor);
+    this.$remove_validation_artifacts(x);
     x.remove();
 }
 
@@ -984,7 +1090,17 @@ NitrogenClass.prototype.$dependency_register_function = function(dependency, fun
     }
     else {
         this.$load_js_dependency(dependency);
-        this.$js_dependencies[dependency].pending_calls.push(fun);
+        var trigger = this.$dep_to_trigger(dependency);
+        this.$js_triggers[trigger].pending_calls.push(fun);
+    }
+};
+
+NitrogenClass.prototype.$register_trigger = function(trigger, fun) {
+    if(this.$is_trigger_loaded(trigger)) {
+        fun();
+    }else{
+        this.$init_trigger_if_needed(trigger);
+        this.$js_triggers[trigger].pending_calls.push(fun);
     }
 };
 
@@ -992,7 +1108,7 @@ NitrogenClass.prototype.$dependency_register_function = function(dependency, fun
 NitrogenClass.prototype.$load_js_dependency = function(url) {
     var n = this;
     // This check will ensure that a js dependency isn't loaded more than once
-    if(!n.$is_dependency_initialized(url)) {
+    if(!n.$is_dependency_loaded(url)) {
         n.$init_dependency_if_needed(url);
 
         // Request the file, and when it finishes, mark the file is loaded, and
@@ -1001,8 +1117,8 @@ NitrogenClass.prototype.$load_js_dependency = function(url) {
             url: url,
             dataType: "script",
             success: function(data, textStatus, jqxhr) { 
-                    n.$js_dependencies[url].loaded=true;
-                    n.$execute_dependency_scripts(url);
+                    n.$set_dependency_loaded(url);
+                    n.$execute_dependency_triggers(url);
                 },
             error: function(jqxhr, textStatus, errorThrown) {
                     n.$console_log({
@@ -1016,31 +1132,71 @@ NitrogenClass.prototype.$load_js_dependency = function(url) {
     }
 };
 
-NitrogenClass.prototype.$init_dependency_if_needed = function(dependency) {
-    if(this.$js_dependencies[dependency]===undefined)
-        this.$js_dependencies[dependency] = {
+
+NitrogenClass.prototype.$dep_to_trigger = function(dep) {
+    return "dependency::" + dep;
+};
+
+NitrogenClass.prototype.$init_trigger_if_needed = function(trigger) {
+    if(this.$js_triggers[trigger]===undefined) {
+        this.$js_triggers[trigger] = {
             loaded: false,
             pending_calls: []
         };
+    }
+};
+
+NitrogenClass.prototype.$init_dependency_if_needed = function(dependency) {
+    var trigger = this.$dep_to_trigger(dependency);
+    return this.$init_trigger_if_needed(trigger);
+};
+
+NitrogenClass.prototype.$is_trigger_initialized = function(trigger) {
+    return this.$js_triggers[trigger]!==undefined
 };
 
 NitrogenClass.prototype.$is_dependency_initialized = function(dependency) {
-    return this.$js_dependencies[dependency]!==undefined
+    var trigger = this.$dep_to_trigger(dependency);
+    return this.$is_trigger_initialized(trigger);
+};
+
+NitrogenClass.prototype.$is_trigger_loaded = function(trigger) {
+    if(!this.$is_trigger_initialized(trigger))
+        return false;
+    else
+        return this.$js_triggers[trigger].loaded;
+};
+
+NitrogenClass.prototype.$set_trigger_loaded = function(trigger) {
+    this.$init_trigger_if_needed(trigger);
+    this.$js_triggers[trigger].loaded=true;
+};
+
+NitrogenClass.prototype.$set_dependency_loaded = function(dependency) {
+    var trigger = this.$dep_to_trigger(dependency);
+    this.$js_triggers[trigger].loaded=true;
 };
 
 NitrogenClass.prototype.$is_dependency_loaded = function(dependency) {
-    if(!this.$is_dependency_initialized(dependency))
-        return false;
-    else
-        return this.$js_dependencies[dependency].loaded;
-}
+    var trigger = this.$dep_to_trigger(dependency);
+    return this.$is_trigger_loaded(trigger);
+};
 
 // Loop through each pending call and execute them in queue order
-NitrogenClass.prototype.$execute_dependency_scripts = function(dependency) {
+NitrogenClass.prototype.$execute_triggers = function(trigger) {
     var fun;
-    while(fun = this.$js_dependencies[dependency].pending_calls.shift())
+    //console.log("executing triggers for: " + trigger);
+    while(fun = this.$js_triggers[trigger].pending_calls.shift())
+    {
+        //console.log(fun);
         fun();
-}
+    }
+};
+
+NitrogenClass.prototype.$execute_dependency_triggers = function(dependency) {
+    var trigger = this.$dep_to_trigger(dependency);
+    return this.$execute_triggers(trigger);
+};
 
 /*** MISC ***/
 
@@ -1110,8 +1266,20 @@ NitrogenClass.prototype.$set_values = function(anchor, element, values) {
 }
 
 NitrogenClass.prototype.$get_value = function(anchor, element) {
-    if (!element.id) element = objs(element);
-    el = element.get(0);
+    var el;
+    if(element == null) {
+        element=anchor;
+    }
+    if(typeof(element)=="string") {
+        element = objs(element);
+    }
+
+    if(element instanceof HTMLElement) {
+        el = element;
+    }else if(element instanceof jQuery) {
+        el = element.get(0);
+    }
+
     if (el.value != undefined) return el.value;
     else if (el.checked != undefined) return el.checked;
     else if (el.src != undefined) return el.src;
@@ -1743,11 +1911,36 @@ NitrogenClass.prototype.$close_websocket = function() {
         n.$disable_websockets();
     }
 };
-    
+
 
 NitrogenClass.prototype.$get_time = function() {
     return (new Date()).getTime();
 };
+
+/* Checking if arguments are of certain format */
+NitrogenClass.prototype.$is_integer = function(v) {
+    if(typeof(v)=="number") {
+        return Number.isInteger(v);
+    }else if(typeof(v)=="string") {
+        return /^-?\d+$/.test(v);
+    }else{
+        return false;
+    }
+};
+
+NitrogenClass.prototype.$is_float = function(v) {
+    if(typeof(v)=="number") {
+        return Number.isFloat(v);
+    }else if(typeof(v)=="string") {
+        return /^-?\d+(\.\d+)?$/.test(v);
+    }else{
+        return false;
+    }
+}
+
+NitrogenClass.prototype.$is_number = function(v) {
+    return this.$is_integer(v) || this.$is_float(v);
+}
 
 var page = document;
 
@@ -1777,3 +1970,5 @@ document.addEventListener('readystatechange', function() {
     Nitrogen.$event_loop();
     Nitrogen.$listen_for_online();
 });
+
+

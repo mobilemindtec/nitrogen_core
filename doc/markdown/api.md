@@ -131,13 +131,30 @@
 
 * <a name="wf_html_encode"></a>`wf:html_encode(String) -> EncodedString`
 
-   HTML encode the supplied String, converting things like < and > into &lt;
+   HTML encode the supplied String, converting things like `<` and `>` into &lt;
    and &gt;.
+
+* <a name="wf_html_encode"></a>`wf:html_encode(String, Encoding) -> EncodedString`
+
+   HTML encode the supplied String, converting things like `<` and `>` into `&lt;`
+   and `&gt;`. `Encoding` can be an atom or a function with arity-1:
+
+   * `true` (default): HTML encode everything except white-spaces.
+   * `false`: Has no effect, returns `String` exactly (really only used internally).
+   * `normal`: An alias of `true`. Has exactly the same effect.
+   * `whites`: HTML encode everything, including newlines, tabs, and
+     greater-than-one contiguous spaces. e.g. `\n` becomes `<br>`, `\t` becomes
+     `&nbsp; &nbsp; &nbsp;`, and two contiguous spaces becomes ` &nbsp;` Single
+     spaces are left unencoded because browser behavior is to not allow
+     word-wrapping with congituous `&nbsp;` (which literally stands for
+     non-breaking space).
+   * Function of arity-1: Call the function with `String` as the only argument,
+     and the return value is the new value.
 
 * <a name="wf_html_decode"></a>`wf:html_decode(String) -> DecodedString`
 
-   HTML decoding decode the supplied String, converting things like &lt; and
-   &gt; into < and >.
+   HTML decoding decode the supplied String, converting things like `&lt;` and
+   `&gt;` into `<` and `>`.
 
 * <a name="wf_url_encode"></a>`wf:url_encode(String) -> EncodedString`
 
