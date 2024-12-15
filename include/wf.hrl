@@ -9,7 +9,6 @@
 -compile({parse_transform, rekt}).
 
 -define(WF_EXTEND(OrigRec, NewRec, Module, Fields), -extend({OrigRec, NewRec, [{module, Module} | Fields]})).
--define(WF_BLANK(X), (X==undefined orelse X=="" orelse X==<<>>)).
 -define(WF_HEX(C), (
                     (C >= $0 andalso C =< $9) orelse
                     (C >= $a andalso C =< $f) orelse
