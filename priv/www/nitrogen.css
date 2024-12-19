@@ -4,7 +4,7 @@
 
 /***** Nitrogen Elements *****/
 
-label {
+label:not(.radio_label) {
     display: block;
     font-weight: bold;
 }
