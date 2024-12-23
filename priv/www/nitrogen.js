@@ -116,20 +116,37 @@ NitrogenClass.prototype.$path_alias = function(path) {
     } else {
         return path;
     }
-}
+};
 
 NitrogenClass.prototype.$anchor = function(anchor, target) {
     this.$anchor_path = this.$path_alias(anchor);
     this.$target_path = this.$path_alias(target);
-}
+};
 
 
 NitrogenClass.prototype.$anchor_root = function(anchor_root) {
     this.$anchor_root_path = anchor_root;
-}
+};
 
 NitrogenClass.prototype.$set_param = function(key, value) {
     this.$params[key] = value;
+    // Might be worth generalizing this in the future to add triggers based on setting of any params,
+    // but at the moment, I can't think of a reason this is necessary
+    if(key=="pageContext") {
+        this.$execute_page_context_triggers();
+    }   
+};
+
+NitrogenClass.prototype.$execute_page_context_triggers = function() {
+    this.$execute_triggers("page_context_initialized");
+};
+
+NitrogenClass.prototype.$register_page_context_trigger = function(fun) {
+    if(this.$params["pageContext"] != null) {
+        fun();
+    }else{
+        this.$register_trigger("page_context_initialized", fun);
+    }
 }
 
 NitrogenClass.prototype.$destroy = function() {
@@ -1094,6 +1111,7 @@ NitrogenClass.prototype.$dependency_register_function = function(dependency, fun
         this.$js_triggers[trigger].pending_calls.push(fun);
     }
 };
+    
 
 NitrogenClass.prototype.$register_trigger = function(trigger, fun) {
     if(this.$is_trigger_loaded(trigger)) {
@@ -1184,12 +1202,14 @@ NitrogenClass.prototype.$is_dependency_loaded = function(dependency) {
 
 // Loop through each pending call and execute them in queue order
 NitrogenClass.prototype.$execute_triggers = function(trigger) {
-    var fun;
-    //console.log("executing triggers for: " + trigger);
-    while(fun = this.$js_triggers[trigger].pending_calls.shift())
-    {
-        //console.log(fun);
-        fun();
+    if(this.$js_triggers[trigger] != undefined) {
+        var fun;
+        //console.log("executing triggers for: " + trigger);
+        while(fun = this.$js_triggers[trigger].pending_calls.shift())
+        {
+            //console.log(fun);
+            fun();
+        }
     }
 };
 
@@ -1620,6 +1640,8 @@ NitrogenClass.prototype.$disable_websockets = function() {
     }
 };
 
+NitrogenClass.$
+
 NitrogenClass.prototype.$ws_init = function() {
     try {
         if(this.$websocket!=null && this.$websocket.readyState==this.$websocket.OPEN) {
@@ -1644,16 +1666,18 @@ NitrogenClass.prototype.$ws_init = function() {
             this.$websocket_connecting_start = this.$get_time();
             this.$websocket.binaryType="arraybuffer";
             var this2 = this;
-            this.$websocket.onopen = function(evt) {
-                if(this2.$websocket.instance_id == evt.target.instance_id) {
-                    //has_opened=true;
-                    this2.$last_sleep_time = this2.$get_time();
-                    this2.$current_websocket_instance_id = this2.$websocket.instance_id;
-                    this2.$ws_open();
-                }else{
-                    evt.target.close();
-                    this2.$console_log("An older websocket attempt connected.  Closing it to avoid conflicts.");
-                }
+            this.$websocket.onopen = function(evt) { 
+                this2.$register_page_context_trigger(function() {
+                    if(this2.$websocket.instance_id == evt.target.instance_id) {
+                        //has_opened=true;
+                        this2.$last_sleep_time = this2.$get_time();
+                        this2.$current_websocket_instance_id = this2.$websocket.instance_id;
+                        this2.$ws_open();
+                    }else{
+                        evt.target.close();
+                        this2.$console_log("An older websocket attempt connected.  Closing it to avoid conflicts.");
+                    }
+                });
             };
             this.$websocket.onclose = function(evt) {
                 this2.$handle_websocket_close(evt);

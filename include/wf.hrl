@@ -156,6 +156,7 @@
 
 -ifndef(LOGGER_HRL).
 -define(PRINT(Var), error_logger:info_msg("DEBUG: ~p~n~p:~p~n~p~n  ~p~n", [self(), ?MODULE, ?LINE, ??Var, Var])).
+-define(PRINT(Msg, Args), error_logger:info_msg("DEBUG: ~p~n~p:~p~n  ~ts~n", [self(), ?MODULE, ?LINE, wf:f(Msg, Args)])).
 -define(LOG(Msg, Args), error_logger:info_msg(Msg, Args)).
 -define(WF_LOG(Msg, Args), error_logger:info_msg(Msg, Args)).
 -define(DEBUG, error_logger:info_msg("DEBUG: ~p:~p~n", [?MODULE, ?LINE])).
@@ -164,6 +165,7 @@
 %% logger.hrl has been included - avoid redefining the OTP ?LOG macro
 -define(WF_LOG(Msg, Args), ?LOG_INFO(Msg, Args)).
 -define(PRINT(Var), ?LOG_INFO("DEBUG: ~p: ~p~n", [??Var, Var])).
+-define(PRINT(Msg, Args), ?LOG_INFO("DEBUG: ~ts~n", [wf:f(Msg, Args)])).
 -define(DEBUG, ?LOG_INFO("DEBUG: ~p:~p~n", [?MODULE, ?LINE])).
 -endif.
 

@@ -192,7 +192,7 @@ code_from_data(Rec, ID, Type, ProcessedData, Opts) ->
         });"
     ],
 
-    io:format("JS: ~ts",[JS]),
+    %?PRINT("JS: ~ts",[JS]),
 
     #script{
         dependency_js=JSPath,
