@@ -1,0 +1,41 @@
+name: nitrogen_core tests and dialyzer
+on: push
+
+jobs:
+  linux:
+    name: OTP ${{ matrix.otp_version }} - {{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+
+    strategy:
+      matrix:
+        include:
+            os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
+            otp_version: ['25.x', '26.x', '27.x']
+            rebar3_version: ["3.22.1", "3.24.0"]
+
+    steps:
+      - name: Install firefox
+
+      - name: Install OTP ${{matrix.otp_version}}
+        uses: erlef/setup-beam@v1
+        with:
+          version-type: loose
+          otp-version: ${{ matrix.otp_version}}
+          rebar3-version: ${{ matrix.rebar3_version}}
+
+      - name: Checkout Nitrogen
+        uses: actions/checkout@v3
+
+
+      - name: Install Firefox
+        uses: browser-actions/setup-firefox@v1
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Test Browsers
+        run: make test
+
+      - name: Run Dialyzer
+        run: make dialyzer

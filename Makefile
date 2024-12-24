@@ -29,7 +29,7 @@ test: rebar3
 	mkdir -p test
 	rm -fr test/browsertest
 	$(MAKE) eunit
-	git clone https://github.com/nitrogen/NitrogenProject.com.git -b rebar3 test/browsertest
+	git clone https://github.com/nitrogen/NitrogenProject.com.git -b 3.0 test/browsertest
 	mkdir -p test/browsertest/_checkouts
 	ln -s ../../.. test/browsertest/_checkouts/nitrogen_core
 	cd test/browsertest; $(MAKE) test_all TESTLOGDIR="../results.$(shell date +%Y-%m-%d.%H%M%S)"
