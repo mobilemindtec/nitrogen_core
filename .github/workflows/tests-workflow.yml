@@ -18,7 +18,6 @@ jobs:
         uses: erlef/setup-beam@v1
         with:
           version-type: loose
-          os: {{ matrix.os }}
           otp-version: ${{ matrix.otp_version}}
           rebar3-version: ${{ matrix.rebar3_version}}
 
